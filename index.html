@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber AI - Secure AI Assistant</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/x-icon" href="https://cdn-icons-png.flaticon.com/512/3094/3094707.png">
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">
+                <div class="logo-icon"><i class="fas fa-shield-alt"></i></div>
+                <div class="logo-text">Cyber<span>AI</span></div>
+            </div>
+
+            <button class="new-chat-btn" id="newChatBtn">
+                <i class="fas fa-plus"></i> New Chat
+            </button>
+
+            <div class="history-list">
+                <div class="history-title">Recent Chats</div>
+                <div id="chatHistoryList">
+                    <!-- Chat history will be loaded here -->
+                </div>
+            </div>
+
+            <div class="creator-footer">
+                <div class="creator-text">
+                    Created by <span class="team-name">"The World of Cybersecurity"</span><br>
+                    Developer: <span class="team-name">Team Cybersecurity</span><br>
+                    <small>Version 2.0 • Secure AI</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="main-chat">
+            <div class="chat-header">
+                <div class="chat-title">
+                    <i class="fas fa-shield-alt"></i> Cyber AI Assistant
+                </div>
+                <div class="status-indicator">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Initializing...</span>
+                </div>
+            </div>
+
+            <!-- Messages Container -->
+            <div class="messages-container" id="messagesContainer">
+                <div class="welcome-container" id="welcomeContainer">
+                    <div class="welcome-icon">
+                        <i class="fas fa-robot"></i>
+                        <div class="pulse-ring"></div>
+                    </div>
+                    <h1 class="welcome-title">Welcome to Cyber AI</h1>
+                    <p class="welcome-subtitle">
+                        I'm your secure AI assistant powered by Gemini AI. I specialize in cybersecurity, 
+                        programming, AI topics, and digital safety. How can I help you today?
+                    </p>
+                    
+                    <div class="example-prompts">
+                        <div class="example-prompt" data-prompt="Explain cybersecurity basics for beginners">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Cybersecurity Basics</span>
+                        </div>
+                        <div class="example-prompt" data-prompt="Write a Python script to detect phishing emails">
+                            <i class="fas fa-code"></i>
+                            <span>Python Security Script</span>
+                        </div>
+                        <div class="example-prompt" data-prompt="What are the latest AI security threats?">
+                            <i class="fas fa-brain"></i>
+                            <span>AI Security Threats</span>
+                        </div>
+                        <div class="example-prompt" data-prompt="How to create strong passwords?">
+                            <i class="fas fa-key"></i>
+                            <span>Password Security</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+                <div class="typing-text">Cyber AI is thinking securely...</div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea id="userInput" placeholder="Secure message to Cyber AI..." rows="1" autofocus></textarea>
+                    <div class="input-actions">
+                        <button class="action-btn" id="clearBtn" title="Clear">
+                            <i class="fas fa-eraser"></i>
+                        </button>
+                        <button class="send-button" id="sendButton">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="privacy-notice">
+                    <i class="fas fa-lock"></i> Your conversations are encrypted and secure
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="chat-footer">
+                <div class="footer-text">
+                    <span><i class="fas fa-shield-alt"></i> Powered by Gemini AI • </span>
+                    <span>Created by <span class="developer-name">"The World of Cybersecurity"</span> • </span>
+                    <span>Developed by <span class="developer-name">Team Cybersecurity</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Menu Button -->
+        <button class="mobile-menu-btn" id="mobileMenuBtn">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

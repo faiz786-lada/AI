@@ -1,0 +1,65 @@
+services:
+  # Backend Service (Node.js API)
+  - type: web
+    name: cyber-ai-backend
+    env: node
+    root: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+    healthCheckPath: /health
+    autoDeploy: true
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+      targetMemoryPercent: 70
+      targetCPUPercent: 70
+
+  # Frontend Service (Static Site)
+  - type: web
+    name: cyber-ai-frontend
+    env: static
+    root: frontend
+    buildCommand: |
+      echo "Building frontend..."
+      # Update backend URL in script.js
+      sed -i "s|const BACKEND_URL = .*|const BACKEND_URL = \"https://cyber-ai-backend.onrender.com\";|" script.js
+    staticPublishPath: .
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=3600
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    autoDeploy: true
+
+# Environment Variables (Global)
+envVars:
+  - key: NODE_ENV
+    value: production
+
+# CORS settings for backend
+cors:
+  - origin: https://cyber-ai-frontend.onrender.com
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    headers:
+      - Content-Type
+      - Authorization
+    credentials: true
