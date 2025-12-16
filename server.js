@@ -1,6 +1,3 @@
-[file name]: server.js
-[file content begin]
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
@@ -291,4 +288,3 @@ app.listen(PORT, () => {
         console.warn('⚠️  API key format may be incorrect');
     }
 });
-[file content end]
