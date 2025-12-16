@@ -9,26 +9,23 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ IMPORTANT: CORS fix for Netlify
+// ✅ CORS for Netlify frontend
 app.use(cors({
     origin: [
         'https://cyberchatbot.netlify.app',
         'https://cyber-ai-frontend.onrender.com',
         'http://localhost:5500',
-        'http://127.0.0.1:5500', 
+        'http://127.0.0.1:5500',
         'http://localhost:3000',
-        'http://localhost:8000'
+        'http://localhost:8000',
+        '*'
     ],
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Client'],
     credentials: true
 }));
 
-app.use(helmet({
-    contentSecurityPolicy: false,
-    crossOriginEmbedderPolicy: false
-}));
-
+app.use(helmet());
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
 
@@ -38,25 +35,23 @@ const limiter = rateLimit({
     max: 100,
     message: { error: 'Too many requests', retryAfter: '15 minutes' }
 });
-
 app.use('/api/', limiter);
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
-// Health check endpoint
+// Health check
 app.get('/health', (req, res) => {
     res.status(200).json({
         status: 'healthy',
         service: 'Cyber AI Backend',
         version: '2.0.0',
         timestamp: new Date().toISOString(),
-        geminiStatus: GEMINI_API_KEY ? 'configured' : 'not_configured',
-        cors: 'netlify-enabled'
+        geminiStatus: GEMINI_API_KEY ? 'configured' : 'not_configured'
     });
 });
 
-// Chat endpoint
+// Chat endpoint - FIXED
 app.post('/api/chat', async (req, res) => {
     try {
         const { messages } = req.body;
@@ -73,38 +68,45 @@ app.post('/api/chat', async (req, res) => {
             return res.status(400).json({ error: 'No valid user message found' });
         }
 
-        // Prepare system prompt
+        // ✅ FIXED: Better system prompt
         const systemPrompt = `You are Cyber AI, created by 'The World of Cybersecurity' and developed by Team Cybersecurity.
 You are a helpful, accurate, and friendly AI assistant specialized in cybersecurity, programming, and AI topics.
 
-IMPORTANT RULES:
-1. You are simply "Cyber AI" - never mention being powered by any other AI
-2. Format code properly with markdown code blocks
-3. Keep responses concise but informative
-4. Focus on security, privacy, and best practices
-5. Use emojis to make responses engaging
-6. Include practical examples when possible`;
+IMPORTANT INSTRUCTIONS:
+1. You are simply "Cyber AI" - never mention any other AI models
+2. Respond naturally to greetings, questions, and casual conversation
+3. Format code with markdown when needed
+4. Keep responses helpful but concise
+5. Use emojis occasionally to make it friendly
+6. Be conversational - like a human assistant
 
-        // Prepare request for Gemini
+User's message: "${lastMessage.content}"
+Respond naturally as Cyber AI:`;
+
+        // Prepare Gemini request
         const requestBody = {
             contents: [
                 {
                     parts: [
                         {
-                            text: `${systemPrompt}\n\nUser Message: ${lastMessage.content}\n\nRespond as Cyber AI:`
+                            text: systemPrompt
                         }
                     ]
                 }
             ],
             generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 2000,
-                topP: 0.8,
+                temperature: 0.8,
+                maxOutputTokens: 1000,
+                topP: 0.9,
                 topK: 40
             },
             safetySettings: [
                 {
                     category: "HARM_CATEGORY_HARASSMENT",
+                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                },
+                {
+                    category: "HARM_CATEGORY_HATE_SPEECH",
                     threshold: "BLOCK_MEDIUM_AND_ABOVE"
                 }
             ]
@@ -116,60 +118,73 @@ IMPORTANT RULES:
             requestBody,
             {
                 headers: { 'Content-Type': 'application/json' },
-                timeout: 30000
+                timeout: 25000
             }
         );
 
         const geminiResponse = response.data;
         
-        if (!geminiResponse.candidates || geminiResponse.candidates.length === 0) {
-            throw new Error('No response generated from AI');
+        // ✅ FIXED: Handle all response formats
+        let aiResponse = "";
+        
+        if (geminiResponse.candidates && geminiResponse.candidates[0]?.content?.parts) {
+            aiResponse = geminiResponse.candidates[0].content.parts[0].text;
+        } else if (geminiResponse.choices && geminiResponse.choices[0]?.message?.content) {
+            aiResponse = geminiResponse.choices[0].message.content;
+        } else {
+            console.log('Unexpected Gemini response:', JSON.stringify(geminiResponse, null, 2));
+            throw new Error('Unexpected response format from Gemini');
         }
 
-        let aiResponse = geminiResponse.candidates[0].content.parts[0].text;
-        
         // Clean response
         aiResponse = aiResponse
             .replace(/gemini/gi, 'Cyber AI')
             .replace(/google/gi, '')
             .replace(/powered by.*/gi, '')
             .replace(/i'm an ai.*model/gi, 'I\'m Cyber AI')
+            .replace(/as an ai assistant/gi, 'as Cyber AI')
+            .replace(/language model/gi, 'assistant')
             .trim();
 
-        // Return response
+        // ✅ FIXED: Return proper OpenAI format
         res.json({
-            id: `chat_${Date.now()}`,
-            object: "chat.completion",
-            created: Math.floor(Date.now() / 1000),
-            model: "gemini-2.0-flash",
-            choices: [
-                {
-                    index: 0,
-                    message: {
-                        role: "assistant",
-                        content: aiResponse
-                    },
-                    finish_reason: "stop"
+            choices: [{
+                message: {
+                    role: "assistant",
+                    content: aiResponse
                 }
-            ]
+            }]
         });
 
     } catch (error) {
-        console.error('API Error:', error.message);
+        console.error('❌ API Error:', error.message);
         
-        // Fallback response
-        const fallbackResponse = `I'm Cyber AI, created by "The World of Cybersecurity". 
+        if (error.response) {
+            console.error('Response status:', error.response.status);
+            console.error('Response data:', error.response.data);
+        }
 
-I specialize in:
-• 🔐 Cybersecurity & threat prevention
-• 💻 Programming (Python, JavaScript, Java)
-• 🤖 AI & Machine Learning concepts
-• 🛡️ Digital safety practices
-• 📊 Technology guidance
+        // ✅ FIXED: Better fallback responses
+        const userMessage = req.body?.messages?.find(m => m.role === "user")?.content || "";
+        
+        let fallbackResponse = "";
+        if (userMessage.toLowerCase().includes('hello') || userMessage.toLowerCase().includes('hi')) {
+            fallbackResponse = "Hello! 👋 I'm Cyber AI, your security and programming assistant. How can I help you today?";
+        } else if (userMessage.toLowerCase().includes('name')) {
+            fallbackResponse = "I'm Cyber AI, created by Team Cybersecurity! Nice to meet you! 😊";
+        } else {
+            fallbackResponse = `Hello! I'm Cyber AI. 
 
-How can I assist you today?`;
+I can help you with:
+• 🔐 Cybersecurity & online safety
+• 💻 Programming (Python, JavaScript, etc.)
+• 🤖 AI & technology concepts
+• 🛡️ Digital privacy tips
 
-        res.status(200).json({
+What would you like to know?`;
+        }
+
+        res.json({
             choices: [{
                 message: {
                     role: "assistant",
@@ -181,7 +196,7 @@ How can I assist you today?`;
 });
 
 // 404 handler
-app.use((req, res, next) => {
+app.use((req, res) => {
     res.status(404).json({
         error: 'Endpoint not found',
         message: `The requested endpoint ${req.method} ${req.path} does not exist.`,
@@ -191,7 +206,7 @@ app.use((req, res, next) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-    console.error('Server Error:', err);
+    console.error('🔥 Server Error:', err);
     res.status(500).json({
         error: 'Internal server error',
         message: 'Something went wrong',
@@ -207,7 +222,7 @@ app.listen(PORT, () => {
     🔗 Local: http://localhost:${PORT}
     📍 Port: ${PORT}
     🔐 Gemini API: ${GEMINI_API_KEY ? 'Configured ✓' : 'Not Configured ✗'}
-    🌐 CORS: Netlify Enabled
+    🌐 CORS: Netlify + All origins
     ⏰ Started: ${new Date().toISOString()}
     ============================
     `);
