@@ -11,12 +11,11 @@ const PORT = process.env.PORT || 3000;
 // ✅ SECURE: Trust proxy for production
 app.set('trust proxy', 1);
 
-// ✅ SECURE: CORS configuration - ALLOW ALL for testing
+// ✅ SECURE: CORS configuration - ALLOW ALL origins
 app.use(cors({
     origin: '*',
-    methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Client', 'Accept', 'Origin', 'X-Requested-With'],
-    exposedHeaders: ['Content-Length', 'Content-Type'],
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Client', 'Accept', 'Origin'],
     credentials: false,
     maxAge: 86400
 }));
@@ -24,9 +23,9 @@ app.use(cors({
 // Handle pre-flight requests
 app.options('*', cors());
 
-// ✅ SECURE: Security headers
+// ✅ SECURE: Security headers (relaxed for CORS)
 app.use(helmet({
-    contentSecurityPolicy: false, // Disable for now to avoid CSP issues
+    contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
@@ -37,7 +36,7 @@ app.use(morgan('dev'));
 // ✅ SECURE: Rate limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    max: 100,
     message: { 
         error: 'Too many requests from this IP, please try again later.',
         code: 429
@@ -47,7 +46,7 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// ✅ SECURE: Get API key from environment variable ONLY
+// ✅ SECURE: Get API key from environment variable
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -73,7 +72,8 @@ app.get('/health', (req, res) => {
         keyStatus: apiKeyStatus,
         keyPreview: maskedKey,
         uptime: process.uptime(),
-        cors: 'enabled'
+        cors: 'enabled',
+        model: 'llama-3.3-70b-versatile'
     });
 });
 
@@ -82,9 +82,7 @@ app.post('/api/chat', async (req, res) => {
     try {
         const { messages } = req.body;
         
-        // Log request headers for debugging
-        console.log('Request headers:', req.headers);
-        console.log('Origin:', req.headers.origin);
+        console.log('Request Origin:', req.headers.origin);
         
         if (!messages || !Array.isArray(messages)) {
             return res.status(400).json({
@@ -108,7 +106,7 @@ app.post('/api/chat', async (req, res) => {
 
         const userMsg = lastUserMessage.content.toLowerCase().trim();
         
-        // Cache for common questions (in-memory cache)
+        // Cache for common questions
         const cache = {
             'hello': "Hello! 👋 I'm Cyber AI, created by 'The World of Cybersecurity'!",
             'hi': "Hi! I'm Cyber AI! 😊 How can I assist you with cybersecurity?",
@@ -151,15 +149,16 @@ IMPORTANT RULES:
         // Prepare messages for Groq API
         const apiMessages = [
             systemMessage,
-            ...messages.slice(-10) // Keep last 10 messages for context
+            ...messages.slice(-8) // Keep last 8 messages for context
         ];
 
-        console.log(`Processing request from ${req.headers.origin} with ${apiMessages.length} messages`);
+        console.log(`Processing request with ${apiMessages.length} messages`);
 
+        // Call Groq API with updated model
         const response = await axios.post(
             GROQ_URL,
             {
-                model: "mixtral-8x7b-32768",
+                model: "llama-3.3-70b-versatile", // Updated model
                 messages: apiMessages,
                 temperature: 0.7,
                 max_tokens: 1024,
@@ -170,9 +169,9 @@ IMPORTANT RULES:
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${GROQ_API_KEY}`
                 },
-                timeout: 30000, // 30 seconds timeout
+                timeout: 30000,
                 validateStatus: function (status) {
-                    return status >= 200 && status < 300; // default
+                    return status >= 200 && status < 300;
                 }
             }
         );
@@ -188,8 +187,8 @@ IMPORTANT RULES:
             aiResponse = `I'm Cyber AI, created by 'The World of Cybersecurity'. ${aiResponse}`;
         }
 
-        // Set CORS headers explicitly
-        res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+        // Set CORS headers
+        res.header('Access-Control-Allow-Origin', '*');
         res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Client');
         
@@ -201,32 +200,16 @@ IMPORTANT RULES:
                 }
             }],
             usage: response.data.usage,
-            model: response.data.model,
-            cors: 'allowed'
+            model: response.data.model
         });
 
     } catch (error) {
-        console.error('❌ Chat endpoint error:', {
-            message: error.message,
-            response: error.response?.data,
-            status: error.response?.status
-        });
+        console.error('❌ Chat endpoint error:', error.message);
+        console.error('Error details:', error.response?.data || error.stack);
         
-        const errorType = error.response?.status || 'network';
-        
-        // User-friendly error messages
-        const errorMessages = {
-            401: "API authentication failed. Please check API key configuration.",
-            429: "Rate limit exceeded. Please try again in a moment.",
-            500: "Server error. Please try again.",
-            network: "Network error. Please check your connection and try again.",
-            timeout: "Request timeout. Please try again.",
-            default: "I'm Cyber AI, but I'm having trouble connecting right now. Please try again in a moment."
-        };
-
         const userMsg = req.body?.messages?.find(m => m.role === "user")?.content?.toLowerCase() || "";
         
-        // Smart fallback responses based on user query
+        // Smart fallback responses
         let fallback = "Hello! I'm Cyber AI, created by 'The World of Cybersecurity'. ";
         
         if (userMsg.includes('hello') || userMsg.includes('hi')) {
@@ -235,12 +218,14 @@ IMPORTANT RULES:
             fallback += "Cybersecurity involves protecting systems, networks, and data from digital attacks. 🔐";
         } else if (userMsg.includes('hindi') || userMsg.includes('kya')) {
             fallback += "Main Cyber AI hoon, 'The World of Cybersecurity' dwara banaya gaya! Aapki kya madad kar sakta hoon?";
+        } else if (error.response?.data?.error?.code === 'model_decommissioned') {
+            fallback = "⚠️ **Model Update Required**\n\nThe AI model needs to be updated. Please contact the administrator to update the backend configuration with a newer model like 'llama-3.3-70b-versatile'.";
         } else {
             fallback += "I specialize in cybersecurity, programming, and AI topics. What would you like to know?";
         }
 
-        // Set CORS headers for error response too
-        res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+        // Set CORS headers for error response
+        res.header('Access-Control-Allow-Origin', '*');
         res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Client');
         
@@ -252,20 +237,20 @@ IMPORTANT RULES:
                     content: fallback
                 }
             }],
-            error: errorMessages[errorType] || errorMessages.default,
-            fallback: true,
-            cors: 'allowed'
+            error: error.response?.data?.error?.message || error.message,
+            fallback: true
         });
     }
 });
 
-// Simple test endpoint
+// Test endpoint
 app.get('/test', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.json({
-        message: 'Cyber AI Backend is running!',
+        message: 'Cyber AI Backend v2.1',
+        status: 'online',
         timestamp: new Date().toISOString(),
-        status: 'OK'
+        model: 'llama-3.3-70b-versatile'
     });
 });
 
@@ -282,7 +267,7 @@ app.use((err, req, res, next) => {
     console.error('❌ Server error:', err.stack);
     res.status(500).json({ 
         error: 'Internal server error',
-        message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+        message: 'Something went wrong'
     });
 });
 
@@ -293,23 +278,18 @@ app.listen(PORT, () => {
         'Not set';
     
     console.log(`
-    🚀 CYBER AI BACKEND STARTED
+    🚀 CYBER AI BACKEND v2.1
     ============================
     🔗 Local: http://localhost:${PORT}
     🌐 Public: https://ai-sqcn.onrender.com
     📍 Port: ${PORT}
     🔐 Environment: ${process.env.NODE_ENV || 'development'}
     🔑 API Key: ${apiKeyPreview}
-    🌍 CORS: Enabled for all origins
+    🤖 Model: llama-3.3-70b-versatile
+    🌍 CORS: Enabled (All origins)
     ⏰ Started: ${new Date().toISOString()}
     ============================
     `);
     
-    // Test API key on startup
-    console.log('🔍 Testing API key configuration...');
-    if (GROQ_API_KEY && GROQ_API_KEY.startsWith('gsk_')) {
-        console.log('✅ API key format is valid');
-    } else {
-        console.warn('⚠️  API key format may be incorrect');
-    }
+    console.log('✅ Backend is ready!');
 });
