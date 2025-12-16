@@ -11,28 +11,24 @@ const PORT = process.env.PORT || 3000;
 // ✅ SECURE: Trust proxy for production
 app.set('trust proxy', 1);
 
-// ✅ SECURE: CORS configuration
+// ✅ SECURE: CORS configuration - ALLOW ALL for testing
 app.use(cors({
-    origin: function(origin, callback) {
-        // Allow all origins for now, or specify your frontend URL
-        callback(null, true);
-    },
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
+    origin: '*',
+    methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Client', 'Accept', 'Origin', 'X-Requested-With'],
+    exposedHeaders: ['Content-Length', 'Content-Type'],
+    credentials: false,
+    maxAge: 86400
 }));
+
+// Handle pre-flight requests
+app.options('*', cors());
 
 // ✅ SECURE: Security headers
 app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'"],
-            imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "https://api.groq.com"]
-        }
-    }
+    contentSecurityPolicy: false, // Disable for now to avoid CSP issues
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -76,7 +72,8 @@ app.get('/health', (req, res) => {
         api: 'Groq API',
         keyStatus: apiKeyStatus,
         keyPreview: maskedKey,
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        cors: 'enabled'
     });
 });
 
@@ -84,6 +81,10 @@ app.get('/health', (req, res) => {
 app.post('/api/chat', async (req, res) => {
     try {
         const { messages } = req.body;
+        
+        // Log request headers for debugging
+        console.log('Request headers:', req.headers);
+        console.log('Origin:', req.headers.origin);
         
         if (!messages || !Array.isArray(messages)) {
             return res.status(400).json({
@@ -153,7 +154,7 @@ IMPORTANT RULES:
             ...messages.slice(-10) // Keep last 10 messages for context
         ];
 
-        console.log(`Processing request with ${apiMessages.length} messages`);
+        console.log(`Processing request from ${req.headers.origin} with ${apiMessages.length} messages`);
 
         const response = await axios.post(
             GROQ_URL,
@@ -187,6 +188,11 @@ IMPORTANT RULES:
             aiResponse = `I'm Cyber AI, created by 'The World of Cybersecurity'. ${aiResponse}`;
         }
 
+        // Set CORS headers explicitly
+        res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Client');
+        
         res.json({
             choices: [{
                 message: {
@@ -195,7 +201,8 @@ IMPORTANT RULES:
                 }
             }],
             usage: response.data.usage,
-            model: response.data.model
+            model: response.data.model,
+            cors: 'allowed'
         });
 
     } catch (error) {
@@ -232,6 +239,11 @@ IMPORTANT RULES:
             fallback += "I specialize in cybersecurity, programming, and AI topics. What would you like to know?";
         }
 
+        // Set CORS headers for error response too
+        res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Client');
+        
         // Return fallback response
         res.json({
             choices: [{
@@ -241,16 +253,27 @@ IMPORTANT RULES:
                 }
             }],
             error: errorMessages[errorType] || errorMessages.default,
-            fallback: true
+            fallback: true,
+            cors: 'allowed'
         });
     }
+});
+
+// Simple test endpoint
+app.get('/test', (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.json({
+        message: 'Cyber AI Backend is running!',
+        timestamp: new Date().toISOString(),
+        status: 'OK'
+    });
 });
 
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ 
         error: 'Endpoint not found',
-        availableEndpoints: ['GET /health', 'POST /api/chat']
+        availableEndpoints: ['GET /health', 'POST /api/chat', 'GET /test']
     });
 });
 
@@ -273,9 +296,11 @@ app.listen(PORT, () => {
     🚀 CYBER AI BACKEND STARTED
     ============================
     🔗 Local: http://localhost:${PORT}
+    🌐 Public: https://ai-sqcn.onrender.com
     📍 Port: ${PORT}
     🔐 Environment: ${process.env.NODE_ENV || 'development'}
     🔑 API Key: ${apiKeyPreview}
+    🌍 CORS: Enabled for all origins
     ⏰ Started: ${new Date().toISOString()}
     ============================
     `);
