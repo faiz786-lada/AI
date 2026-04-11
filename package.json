@@ -1,6 +1,7 @@
 {
   "name": "cyber-ai",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "description": "Advanced Cyber AI - Cybersecurity Assistant by Md Faiz Ahmad & Faizan Raza",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -15,7 +16,15 @@
     "morgan": "^1.10.0",
     "express-rate-limit": "^7.1.5"
   },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
   "engines": {
-    "node": ">=16.0.0"
-  }
+    "node": ">=18.0.0"
+  },
+  "keywords": ["cybersecurity", "ai", "chatbot", "ethical-hacking", "groq"],
+  "authors": [
+    { "name": "Md Faiz Ahmad" },
+    { "name": "Faizan Raza" }
+  ]
 }
